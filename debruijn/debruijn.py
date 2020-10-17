@@ -78,13 +78,12 @@ def read_fastq(fastq_file):
             next(filin)
             
 def cut_kmer(seq, kmer_size):
-
-    """Read all sequences and return kmers
+    """
+    Read all sequences and return kmers
     Parameters : seq : a sequence to cut
     		kmer_size : a given size of kmers in argument
     Returns : kmers
     """
-
     for i in range(len(seq)-kmer_size+1):
         yield seq[i:i+kmer_size]            
 
@@ -97,19 +96,78 @@ def build_kmer_dict(fastq_file, kmer_size):
     Returns: dictionnary of kmers with their occurences 
     """
     l_seq = []
+    dic_kmer = {}
     for i in read_fastq(fastq_file):
         l_seq.append(i)
-
-    dic_kmer = {}
     for j in range(len(l_seq)):
         l_kmer = []
         for i in cut_kmer(l_seq[j], kmer_size):
             l_kmer.append(i)
-
         for i in range(len(l_kmer)):
             if l_kmer[i] not in dic_kmer:
                 dic_kmer[l_kmer[i]] = l_kmer.count(l_kmer[i])
+                
     return dic_kmer        
+    
+def build_graph(dic_kmer):
+    """
+    Build a tree of prefixes and suffixes kmers
+    Parameters : dic_kmer : dictionnary of kmers with their occurences
+    Returns : tree of prefixes and suffixes kmers
+    """
+    tree_graph = nx.DiGraph()
+    for key, val in dic_kmer.items():
+        tree_graph.add_edge(key[:-1], key[1:], weight=val)
+        
+    return tree_graph
+    
+        
+def get_starting_nodes(tree_graph):
+    """
+    Construct a list of starting nodes from the tree_graph
+    Parameters : tree_graph : tree of prefixes and suffixes kmers
+    Returns : list of starting nodes 
+    """
+    start = []
+    for node in tree_graph.nodes:
+        if len(list(tree_graph.predecessors(node))) == 0:
+            start.append(node)
+
+    return start
+
+
+def get_sink_nodes(tree_graph):
+    """
+    Construct a list of sink nodes from the tree_graph
+    Parameters : tree_graph : tree of prefixes and suffixes kmers
+    Returns : list of sink nodes 
+    """
+    sink = []
+    for node in tree_graph.nodes:
+        if len(list(tree_graph.successors(node))) == 0:
+            sink.append(node)
+
+    return sink
+    
+    
+def get_contigs(tree_graph, start, sink):
+    """
+    Get the different possible contigs from list of starting nodes, list of sink nodes and tree_graph
+    Paramters : tree_graph :tree of prefixes and suffixes kmers
+    		start: list of starting nodes
+    		sink: list of sink nodes 
+    Returns : A list of tuples with contig and length of contig
+    """  
+    contigs = []
+    for start_node in start:
+        for sink_node in sink:
+            for path in nx.all_simple_paths(tree_graph, start_node, sink_node):
+                contig = path[0]
+                for i in range(1,len(path)):
+                    contig += path[i][-1]
+                contigs.append((contig, len(contig)))
+                
+    return contigs    
     
 
 #==============================================================
