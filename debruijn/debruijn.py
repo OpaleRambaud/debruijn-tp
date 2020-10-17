@@ -64,6 +64,53 @@ def get_arguments():
                         help="Output contigs in fasta file")
     return parser.parse_args()
 
+def read_fastq(fastq_file):
+
+    """Read a fastq file and return by yield sequences
+    Parameters : fastq_file : a fastq_file given in argument
+    Returns : sequences (yield)  
+    """
+
+    with open(fastq_file, "r") as filin:
+        for line in filin:
+            yield next(filin).strip()
+            next(filin)
+            next(filin)
+            
+def cut_kmer(seq, kmer_size):
+
+    """Read all sequences and return kmers
+    Parameters : seq : a sequence to cut
+    		kmer_size : a given size of kmers in argument
+    Returns : kmers
+    """
+
+    for i in range(len(seq)-kmer_size+1):
+        yield seq[i:i+kmer_size]            
+
+    
+def build_kmer_dict(fastq_file, kmer_size):
+    """
+    Build a dictionnary of kmers for all sequences of the fastq file and the occurence of each kmers
+    Parameters : fastq_file : a fastq_file given in argument
+    		kmer_size: a given size of kmers in argument
+    Returns: dictionnary of kmers with their occurences 
+    """
+    l_seq = []
+    for i in read_fastq(fastq_file):
+        l_seq.append(i)
+
+    dic_kmer = {}
+    for j in range(len(l_seq)):
+        l_kmer = []
+        for i in cut_kmer(l_seq[j], kmer_size):
+            l_kmer.append(i)
+
+        for i in range(len(l_kmer)):
+            if l_kmer[i] not in dic_kmer:
+                dic_kmer[l_kmer[i]] = l_kmer.count(l_kmer[i])
+    return dic_kmer        
+    
 
 #==============================================================
 # Main program
