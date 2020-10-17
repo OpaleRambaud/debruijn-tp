@@ -119,8 +119,8 @@ def main():
     """
     Main program function
     """
-    # Get arguments
+    #1. Lecture du fichier et construction du graphe :
     args = get_arguments()
-
+    dic_kmer = build_kmer_dict(args.fastq_file, args.kmer_size)
 if __name__ == '__main__':
     main()
