@@ -168,6 +168,7 @@ def get_contigs(tree_graph, start, sink):
                 contigs.append((contig, len(contig)))
                 
     return contigs    
+
 def fill(text, width=80):
     """Split text with a line return to respect fasta format"""
     return os.linesep.join(text[i:i+width] for i in range(0, len(text), width))
