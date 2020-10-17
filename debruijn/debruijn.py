@@ -168,17 +168,151 @@ def get_contigs(tree_graph, start, sink):
                 contigs.append((contig, len(contig)))
                 
     return contigs    
+def fill(text, width=80):
+    """Split text with a line return to respect fasta format"""
+    return os.linesep.join(text[i:i+width] for i in range(0, len(text), width))
+
+def save_contigs(contig_tuple, output_file):
+    """
+    Save the contigs in a text file with fasta form
+    Parameters : contig_tuple :tuples with contig and length of contig
+    		output_file : the name of the output file given in arguments
+    Returns : a text file with fasta form with contigs inside
+    """
+    with open(output_file, "w+") as filout: 
+        for i, contig in enumerate(contig_tuple):
+            filout.write(">contig_"+str(i)+" len="+str(contig[1])+"\n")
+            filout.write(fill(contig[0])+"\n")
+        filout.close()
     
+
+def std(val):
+    """
+    Calcul std
+    Parameters : val: liste of integer
+    Returns: std of the list of integer
+    """
+    return statistics.stdev(val)
+
+def path_average_weight(tree_graphe, path):
+    """
+    Caclul the average weights for all paths 
+    Parameters : tree_graph :tree of prefixes and suffixes kmers
+    		paths : list of paths
+    Returns : Mean of the weight for each paths
+    """
+    avg_weights = []
+    for edge in tree_graphe.subgraph(path).edges(data=True):
+        avg_weights.append(edge['weight'])
+    return statistics.mean(avg_weights)
+
+def remove_paths(tree_graphe, paths, delete_entry_node=False, delete_sink_node=False):
+    """
+    Remove a path containing starting or ending nodes
+    Parameters : tree_graph :tree of prefixes and suffixes kmers
+    		paths : list of paths
+    Returns : tree_graphe without paths containings starting or ending nodes
+    """
+    for path in paths:
+        if delete_entry_node and delete_sink_node is not True:
+            tree_graphe.remove_nodes_from(path[:-1])
+        elif delete_entry_node and delete_sink_node:
+            tree_graphe.remove_nodes_from(path)
+        elif delete_entry_node is not True and delete_sink_node:
+            tree_graphe.remove_nodes_from(path[1:])            
+        elif delete_entry_node is not True and delete_sink_node is not True:
+            tree_graphe.remove_nodes_from(path[1:-1])
+          
+    return tree_graphe
+
+def select_best_path(tree_graph, paths, path_len_m, path_weight_m, delete_entry_node=False, delete_sink_node=False):
+    """
+    Select the best path between all paths
+    Parameters : tree_graph :tree of prefixes and suffixes kmers
+    		paths : list of paths to remove
+    		path_len_m: list of paths lenght
+    		path_weight_m: list of paths weights
+    Returns : graph with only best path
+    """
+    random.seed(9001) 
+      
+    #weight :
+   
+    max_weight = max(path_weight_m)   
+    weight_ind = [i for i, j in enumerate(path_weight_m) if j == max_weight]
+    best_paths = [paths[i] for i in weight_ind]
+    
+    #lenght :
+    
+    path_len_m = [path_len_m[i] for i in idx]
+    max_len = max(path_len_m)
+    len_ind = [i for i, j in enumerate(path_len_m) if j == max_len]
+    best_paths = [best_paths[i] for i in len_ind]
+    
+    
+    if len(best_paths) > 1:
+        best_paths = best_paths[random.randint(0, len(best_paths))]
+    paths.remove(best_paths[0])
+    tree_graph = remove_paths(tree_graph, paths, delete_entry_node, delete_sink_node)
+    
+    return tree_graph
+    
+def solve_bubble(tree_graph, ancestor_node, new_node):
+    """
+    Remove one bubble in tree_graph
+    Parameters :tree_graph :tree of prefixes and suffixes kmers
+    		ancestor_node 
+    		new_node
+    """
+    paths_l = list(nx.all_simple_paths(tree_graph, ancestor_node, new_node))
+    path_len = []
+    path_weight = []
+    for path in paths_l:
+        path_len.append(len(path))
+        path_weight.append(path_average_weight(tree_graph, path))
+    graph = select_best_path(tree_graph, paths, path_len, path_weight)
+    
+    return tree_graph
+    
+    
+def simplify_bubbles(tree_graphe):
+    """
+    Remove bubbles in tree_graph
+    Parameters : tree_graphe: tree_graph :tree of prefixes and suffixes kmers
+    Returns: tree_graph without bubbles
+    """  
+    bubbles = []
+    for node in tree_graphe.nodes():
+        predecessors_list = list(tree_graphe.predecessors(node))
+        if len(predecessors_list) > 1:
+            ancestor = nx.lowest_common_ancestor(tree_graphe, predecessors_list[0], predecessors_list[1])
+            bubbles.append([ancestor, node])
+    for i in range(len(bubbles)):
+        tree_graphe = solve_bubble(tree_graphe, bubbles[i][0], bubbles[i][1])
+        
+    return tree_graphe      
 
 #==============================================================
 # Main program
 #==============================================================
 def main():
-    """
-    Main program function
-    """
-    #1. Lecture du fichier et construction du graphe :
+
+    """Main function"""
+
+    #Lecture du fichier et construction du graphe :
     args = get_arguments()
     dic_kmer = build_kmer_dict(args.fastq_file, args.kmer_size)
+    tree_graph = build_graph(dic_kmer)
+
+    #Résolution des bulles : 
+    tree_graph = simplify_bubbles(tree_graph)    
+
+    #Ecriture des contigs : 
+    strt_nodes = get_starting_nodes(tree_graph)
+    s_nodes = get_sink_nodes(tree_graph)
+    contigs = get_contigs(tree_graph, strt_nodes, s_nodes)
+    save_contigs(contigs, args.output_file)
+    
+
 if __name__ == '__main__':
     main()
